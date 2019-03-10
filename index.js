@@ -1,45 +1,36 @@
 const streamUrls = require('./lib/streamUrls');
-const { share, partition } = require('rxjs/operators');
+const { partition } = require('rxjs/operators');
 const {
   filterOutPages,
   fetchHTML,
   searchForHrefs,
   hasAnyFoundHrefs,
-} = require('./lib/operators')
+} = require('./lib/operators');
+const Options = require('./lib/options');
+const Reporter = require('./lib/reporter');
 
-const SOURCE = `${__dirname}/source.xlsx`;
-const SEARCHED_LINK =
-  'https://www.kopalnia.pl/';
+const options = new Options();
+const source = options.getSource();
+const searchedLink = options.getSearchedLink();
 
-  const urls$ = streamUrls(SOURCE)
-    .pipe(
-      share(),
-      filterOutPages(),
-      fetchHTML(),
-      searchForHrefs([SEARCHED_LINK]),
-    );
+const reporter = Reporter.create({ searchedLink });
 
-  urls$
-    .subscribe(
-      (article) => console.log(`Article ${article.index} from ${article.total}`)
-    )
 
-  const [urlsFound$, urlsNotFound$] = urls$.pipe(
-    partition(
-      hasAnyFoundHrefs()
-    )
+const urls$ = streamUrls(source)
+  .pipe(
+    filterOutPages(),
+    fetchHTML(),
+    searchForHrefs([searchedLink]),
   );
 
 
-  urlsFound$
-    .subscribe(
-      (article) => console.log('found')
-    );
-
-  urlsNotFound$
-    .subscribe(
-      () => console.log('NOUT FOUND')
-    );
+const [urlsFound$, urlsNotFound$] = urls$.pipe(
+  partition(
+    hasAnyFoundHrefs()
+  )
+);
 
 
+urlsFound$.subscribe(reporter.Found);
+urlsNotFound$.subscribe(reporter.NotFound);
 
